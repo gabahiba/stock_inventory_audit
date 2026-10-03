@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Vue formulaire du wizard : affichée dans la petite fenêtre -->
+    <record id="inventory_audit_revert_wizard_view_form" model="ir.ui.view">
+        <field name="name">inventory.audit.revert.wizard.form</field>
+        <field name="model">inventory.audit.revert.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Revert Audit">
+                <group>
+                    <!-- Champ caché : sert seulement en interne, l'utilisateur
+                         n'a pas besoin de le voir (audit déjà connu) -->
+                    <field name="audit_id" invisible="1"/>
+                    <!-- Les deux choix, sous forme de boutons radio -->
+                    <field name="revert_mode" widget="radio"/>
+                </group>
+                <footer>
+                    <!-- Bouton qui appelle action_confirm() sur le wizard -->
+                    <button name="action_confirm" type="object"
+                            string="Confirm" class="btn-primary"/>
+                    <!-- Bouton spécial : ferme juste la fenêtre, sans rien faire -->
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

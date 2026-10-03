@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- noupdate="1" : la séquence n'est créée qu'une fois, un -u ne la remet pas à zéro -->
+<odoo noupdate="1">
+
+    <!-- Crée une séquence (table ir.sequence) : le compteur des références -->
+    <record id="inventory_audit_sequence" model="ir.sequence">
+        <!-- Nom lisible de la séquence -->
+        <field name="name">Inventory Audit</field>
+        <!-- Code utilisé dans le Python : next_by_code('inventory.audit') -->
+        <field name="code">inventory.audit</field>
+        <!-- Préfixe : AUD/ suivi de l'année en cours, ex. AUD/2026/ -->
+        <field name="prefix">AUD/%(year)s/</field>
+        <!-- Nombre de chiffres du compteur : 0001, 0002, ... -->
+        <field name="padding">4</field>
+        <!-- Vide = séquence partagée par toutes les sociétés -->
+        <field name="company_id" eval="False"/>
+    </record>
+
+</odoo>

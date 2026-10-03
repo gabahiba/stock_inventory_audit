@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_inventory_audit_user,inventory.audit user,model_inventory_audit,stock.group_stock_user,1,1,1,0
+access_inventory_audit_manager,inventory.audit manager,model_inventory_audit,stock.group_stock_manager,1,1,1,1
+access_inventory_audit_line_user,inventory.audit.line user,model_inventory_audit_line,stock.group_stock_user,1,1,1,0
+access_inventory_audit_line_manager,inventory.audit.line manager,model_inventory_audit_line,stock.group_stock_manager,1,1,1,1
+access_inventory_audit_revert_wizard,inventory.audit.revert.wizard,model_inventory_audit_revert_wizard,stock.group_stock_user,1,1,1,1
