@@ -1,183 +1,519 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <odoo>
 
+    <!-- ========================================================= -->
+    <!-- INVENTORY AUDIT FORM                                      -->
+    <!-- ========================================================= -->
+
     <record id="inventory_audit_view_form" model="ir.ui.view">
+
         <field name="name">inventory.audit.form</field>
+
         <field name="model">inventory.audit</field>
+
         <field name="arch" type="xml">
+
             <form string="Inventory Audit">
 
+                <!-- ================================================= -->
+                <!-- HEADER                                             -->
+                <!-- ================================================= -->
+
                 <header>
-                    <button name="action_start" type="object"
-                            string="Start Inventory" class="btn-primary"
-                            invisible="state != 'draft'"/>
 
-                    <button name="action_validate" type="object"
-                            string="Validate Inventory" class="btn-primary"
-                            invisible="state != 'in_progress'"
-                            confirm="Validate the inventory and post the stock adjustments?"/>
+                    <button
+                        name="action_start"
+                        type="object"
+                        string="Start Inventory"
+                        class="btn-primary"
+                        invisible="state != 'draft'"
+                    />
 
-                    <button name="action_cancel" type="object"
-                            string="Cancel Inventory"
-                            invisible="state in ('validated', 'reverted', 'cancelled')"/>
+                    <!--
+                        Ajoute les opérations faites depuis
+                        le démarrage aux quantités théorique
+                        et comptée.
+                    -->
 
-                    <!-- Ouvre le wizard de choix Keep / Delete -->
-                    <button name="action_open_revert_wizard" type="object"
-                            string="Revert"
-                            invisible="state != 'validated'"/>
+                    <button
+                        name="action_refresh"
+                        type="object"
+                        string="Refresh"
+                        invisible="state != 'in_progress'"
+                    />
 
-                    <field name="state" widget="statusbar"
-                           statusbar_visible="draft,in_progress,validated,reverted"/>
+                    <button
+                        name="action_validate"
+                        type="object"
+                        string="Validate Inventory"
+                        class="btn-primary"
+                        invisible="state != 'in_progress'"
+                        confirm="Validate the inventory and post the stock adjustments?"
+                    />
+
+                    <!--
+                        Ouvre le popup Historical Quantity.
+                        Aucun stock n'est modifié.
+                    -->
+
+                    <button
+                        name="action_open_historical_qty"
+                        type="object"
+                        string="Historical Quantity"
+                    />
+
+                    <button
+                        name="action_cancel"
+                        type="object"
+                        string="Cancel Inventory"
+                        invisible="state in ('validated', 'reverted', 'cancelled')"
+                    />
+
+                    <!--
+                        Ouvre le wizard de choix Keep / Delete.
+                    -->
+
+                    <button
+                        name="action_open_revert_wizard"
+                        type="object"
+                        string="Revert"
+                        invisible="state != 'validated'"
+                    />
+
+                    <field
+                        name="state"
+                        widget="statusbar"
+                        statusbar_visible="draft,in_progress,validated,reverted"
+                    />
+
                 </header>
+
+                <!-- ================================================= -->
+                <!-- SHEET                                              -->
+                <!-- ================================================= -->
 
                 <sheet>
 
-                    <div class="oe_button_box" name="button_box">
-                        <button name="action_view_moves" type="object"
-                                class="oe_stat_button" icon="fa-exchange"
-                                invisible="move_count == 0">
-                            <field name="move_count" widget="statinfo"
-                                   string="Stock Moves"/>
+                    <!-- ================================================= -->
+                    <!-- SMART BUTTONS                                    -->
+                    <!-- ================================================= -->
+
+                    <div
+                        class="oe_button_box"
+                        name="button_box"
+                    >
+
+                        <button
+                            name="action_view_moves"
+                            type="object"
+                            class="oe_stat_button"
+                            icon="fa-exchange"
+                            invisible="move_count == 0"
+                        >
+
+                            <field
+                                name="move_count"
+                                widget="statinfo"
+                                string="Stock Moves"
+                            />
+
                         </button>
+
                     </div>
 
+                    <!-- ================================================= -->
+                    <!-- TITLE                                             -->
+                    <!-- ================================================= -->
+
                     <h1>
-                        <field name="name" readonly="state != 'draft'"/>
+
+                        <field
+                            name="name"
+                            readonly="state != 'draft'"
+                        />
+
                     </h1>
 
+                    <!-- ================================================= -->
+                    <!-- GENERAL INFORMATION                               -->
+                    <!-- ================================================= -->
+
                     <group>
+
                         <group>
-                            <field name="audit_date" readonly="state != 'draft'"/>
-                            <field name="user_id" readonly="state != 'draft'"/>
+
+                            <!-- Date du comptage physique -->
+                            <field
+                                name="audit_date"
+                                readonly="state != 'draft'"
+                            />
+
+                            <!-- Visible seulement après validation -->
+                            <field
+                                name="validation_date"
+                                invisible="not validation_date"
+                            />
+
+                            <field
+                                name="user_id"
+                                readonly="state != 'draft'"
+                            />
+
                         </group>
+
                         <group>
-                            <field name="company_id" readonly="state != 'draft'"/>
+
+                            <field
+                                name="company_id"
+                                readonly="state != 'draft'"
+                            />
+
                         </group>
+
                     </group>
 
-                    <group string="Scope" col="1">
-                        <group col="2">
-                            <field name="scope_warehouse" readonly="state != 'draft'"/>
-                            <field name="warehouse_id" nolabel="1"
-                                   invisible="not scope_warehouse"
-                                   required="scope_warehouse"
-                                   readonly="state != 'draft'"/>
-                        </group>
+                    <!-- ================================================= -->
+                    <!-- SCOPE                                             -->
+                    <!-- ================================================= -->
+
+                    <group
+                        string="Scope"
+                        col="1"
+                    >
+
+                        <!-- Warehouse -->
 
                         <group col="2">
-                            <field name="scope_category" readonly="state != 'draft'"/>
-                            <field name="category_ids" widget="many2many_tags" nolabel="1"
-                                   invisible="not scope_category"
-                                   required="scope_category"
-                                   readonly="state != 'draft'"/>
+
+                            <field
+                                name="scope_warehouse"
+                                readonly="state != 'draft'"
+                            />
+
+                            <field
+                                name="warehouse_id"
+                                nolabel="1"
+                                invisible="not scope_warehouse"
+                                required="scope_warehouse"
+                                readonly="state != 'draft'"
+                            />
+
                         </group>
 
-                        <group col="2">
-                            <field name="scope_product" readonly="state != 'draft'"/>
-                            <field name="product_ids" widget="many2many_tags" nolabel="1"
-                                   invisible="not scope_product"
-                                   required="scope_product"
-                                   readonly="state != 'draft'"/>
-                        </group>
+                        <!-- Category -->
 
                         <group col="2">
-                            <field name="scope_location" readonly="state != 'draft'"/>
-                            <field name="location_ids" widget="many2many_tags" nolabel="1"
-                                   invisible="not scope_location"
-                                   required="scope_location"
-                                   readonly="state != 'draft'"/>
+
+                            <field
+                                name="scope_category"
+                                readonly="state != 'draft'"
+                            />
+
+                            <field
+                                name="category_ids"
+                                widget="many2many_tags"
+                                nolabel="1"
+                                invisible="not scope_category"
+                                required="scope_category"
+                                readonly="state != 'draft'"
+                            />
+
                         </group>
+
+                        <!-- Product -->
+
+                        <group col="2">
+
+                            <field
+                                name="scope_product"
+                                readonly="state != 'draft'"
+                            />
+
+                            <field
+                                name="product_ids"
+                                widget="many2many_tags"
+                                nolabel="1"
+                                invisible="not scope_product"
+                                required="scope_product"
+                                readonly="state != 'draft'"
+                            />
+
+                        </group>
+
+                        <!-- Location -->
+
+                        <group col="2">
+
+                            <field
+                                name="scope_location"
+                                readonly="state != 'draft'"
+                            />
+
+                            <field
+                                name="location_ids"
+                                widget="many2many_tags"
+                                nolabel="1"
+                                invisible="not scope_location"
+                                required="scope_location"
+                                readonly="state != 'draft'"
+                            />
+
+                        </group>
+
                     </group>
+
+                    <!-- ================================================= -->
+                    <!-- NOTEBOOK                                           -->
+                    <!-- ================================================= -->
 
                     <notebook>
+
                         <page string="Audit Lines">
+
                             <field name="line_ids">
-                                <list editable="bottom" create="0" delete="0"
-                                      decoration-success="difference_qty &gt; 0"
-                                      decoration-danger="difference_qty &lt; 0">
-                                    <field name="product_id" readonly="1"/>
-                                    <field name="location_id" readonly="1"/>
-                                    <field name="lot_id" readonly="1"/>
-                                    <field name="theoretical_qty" readonly="1"/>
-                                    <field name="counted_qty"
-                                           readonly="parent.state != 'in_progress'"/>
-                                    <field name="difference_qty"/>
+
+                                <list
+                                    editable="bottom"
+                                    create="0"
+                                    delete="0"
+                                    decoration-success="difference_qty &gt; 0"
+                                    decoration-danger="difference_qty &lt; 0"
+                                >
+
+                                    <field
+                                        name="product_id"
+                                        readonly="1"
+                                    />
+
+                                    <field
+                                        name="location_id"
+                                        readonly="1"
+                                    />
+
+                                    <field
+                                        name="lot_id"
+                                        readonly="1"
+                                    />
+
+                                    <field
+                                        name="theoretical_qty"
+                                        readonly="1"
+                                    />
+
+                                    <field
+                                        name="counted_qty"
+                                        readonly="parent.state != 'in_progress'"
+                                    />
+
+                                    <field
+                                        name="difference_qty"
+                                    />
+
                                 </list>
+
                             </field>
+
                         </page>
+
                     </notebook>
+
                 </sheet>
+
             </form>
+
         </field>
+
     </record>
 
-    <record id="inventory_audit_view_list" model="ir.ui.view">
+
+    <!-- ========================================================= -->
+    <!-- INVENTORY AUDIT LIST                                      -->
+    <!-- ========================================================= -->
+
+    <record
+        id="inventory_audit_view_list"
+        model="ir.ui.view"
+    >
+
         <field name="name">inventory.audit.list</field>
+
         <field name="model">inventory.audit</field>
+
         <field name="arch" type="xml">
+
             <list string="Inventory Audits">
+
                 <field name="name"/>
+
                 <field name="audit_date"/>
+
+                <field
+                    name="validation_date"
+                    optional="show"
+                />
+
                 <field name="scope_summary"/>
+
                 <field name="user_id"/>
-                <field name="state" widget="badge"
-                       decoration-info="state == 'draft'"
-                       decoration-warning="state == 'in_progress'"
-                       decoration-success="state == 'validated'"
-                       decoration-muted="state in ('reverted', 'cancelled')"/>
+
+                <field
+                    name="state"
+                    widget="badge"
+                    decoration-info="state == 'draft'"
+                    decoration-warning="state == 'in_progress'"
+                    decoration-success="state == 'validated'"
+                    decoration-muted="state in ('reverted', 'cancelled')"
+                />
+
             </list>
+
         </field>
+
     </record>
 
-    <record id="inventory_audit_view_search" model="ir.ui.view">
+
+    <!-- ========================================================= -->
+    <!-- SEARCH VIEW                                               -->
+    <!-- ========================================================= -->
+
+    <record
+        id="inventory_audit_view_search"
+        model="ir.ui.view"
+    >
+
         <field name="name">inventory.audit.search</field>
+
         <field name="model">inventory.audit</field>
+
         <field name="arch" type="xml">
+
             <search string="Search Inventory Audits">
+
                 <field name="name"/>
-                <filter name="filter_draft" string="Draft"
-                        domain="[('state', '=', 'draft')]"/>
-                <filter name="filter_in_progress" string="In Progress"
-                        domain="[('state', '=', 'in_progress')]"/>
-                <filter name="filter_validated" string="Validated"
-                        domain="[('state', '=', 'validated')]"/>
-                <filter name="filter_reverted" string="Reverted"
-                        domain="[('state', '=', 'reverted')]"/>
+
+                <filter
+                    name="filter_draft"
+                    string="Draft"
+                    domain="[('state', '=', 'draft')]"
+                />
+
+                <filter
+                    name="filter_in_progress"
+                    string="In Progress"
+                    domain="[('state', '=', 'in_progress')]"
+                />
+
+                <filter
+                    name="filter_validated"
+                    string="Validated"
+                    domain="[('state', '=', 'validated')]"
+                />
+
+                <filter
+                    name="filter_reverted"
+                    string="Reverted"
+                    domain="[('state', '=', 'reverted')]"
+                />
+
                 <group>
-                    <filter name="group_state" string="Status"
-                            context="{'group_by': 'state'}"/>
+
+                    <filter
+                        name="group_state"
+                        string="Status"
+                        context="{'group_by': 'state'}"
+                    />
+
                 </group>
+
             </search>
+
         </field>
+
     </record>
 
-    <record id="inventory_audit_move_view_list" model="ir.ui.view">
+
+    <!-- ========================================================= -->
+    <!-- STOCK MOVES LIST                                          -->
+    <!-- ========================================================= -->
+
+    <record
+        id="inventory_audit_move_view_list"
+        model="ir.ui.view"
+    >
+
         <field name="name">inventory.audit.move.list</field>
+
         <field name="model">stock.move</field>
+
         <field name="arch" type="xml">
-            <list string="Stock Moves" create="0"
-                  decoration-success="audit_move_type == 'gain'"
-                  decoration-danger="audit_move_type == 'loss'">
+
+            <list
+                string="Stock Moves"
+                create="0"
+                decoration-success="audit_move_type == 'gain'"
+                decoration-danger="audit_move_type == 'loss'"
+            >
+
                 <field name="product_id"/>
-                <field name="location_id" string="From"/>
-                <field name="location_dest_id" string="To"/>
-                <field name="product_uom_qty" string="Quantity"/>
+
+                <field
+                    name="location_id"
+                    string="From"
+                />
+
+                <field
+                    name="location_dest_id"
+                    string="To"
+                />
+
+                <field
+                    name="product_uom_qty"
+                    string="Quantity"
+                />
+
                 <field name="state"/>
-                <field name="audit_move_type" column_invisible="1"/>
+
+                <field
+                    name="audit_move_type"
+                    column_invisible="1"
+                />
+
             </list>
+
         </field>
+
     </record>
 
-    <record id="inventory_audit_action" model="ir.actions.act_window">
+
+    <!-- ========================================================= -->
+    <!-- ACTION                                                     -->
+    <!-- ========================================================= -->
+
+    <record
+        id="inventory_audit_action"
+        model="ir.actions.act_window"
+    >
+
         <field name="name">Inventory Audits</field>
+
         <field name="res_model">inventory.audit</field>
+
         <field name="view_mode">list,form</field>
+
     </record>
 
-    <menuitem id="inventory_audit_menu"
-              name="Inventory Audits"
-              parent="stock.menu_stock_adjustments"
-              action="inventory_audit_action"
-              sequence="90"/>
+
+    <!-- ========================================================= -->
+    <!-- MENU                                                       -->
+    <!-- ========================================================= -->
+
+    <menuitem
+        id="inventory_audit_menu"
+        name="Inventory Audits"
+        parent="stock.menu_stock_adjustments"
+        action="inventory_audit_action"
+        sequence="90"
+    />
 
 </odoo>

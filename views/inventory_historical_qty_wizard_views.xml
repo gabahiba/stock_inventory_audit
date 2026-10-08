@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 1) Popup ouvert par le bouton "Historical Quantity" de l'audit :
+            la date + des filtres OPTIONNELS, et deux boutons qui ouvrent
+            une page séparée avec le résultat. -->
+    <record id="inventory_historical_qty_wizard_view_form" model="ir.ui.view">
+        <field name="name">inventory.historical.qty.wizard.form</field>
+        <field name="model">inventory.historical.qty.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Historical Quantity">
+                <group>
+                    <group>
+                        <field name="date"/>
+                        <field name="company_id"/>
+                    </group>
+                    <group>
+                        <field name="warehouse_id"/>
+                        <field name="location_ids" widget="many2many_tags"/>
+                        <field name="category_ids" widget="many2many_tags"/>
+                        <field name="product_ids" widget="many2many_tags"/>
+                    </group>
+                </group>
+                <p class="text-muted">
+                    All filters are optional: leave them empty to include
+                    every product and every location. You can also filter
+                    on the result page.
+                </p>
+
+                <footer>
+                    <button name="action_show_quantity" type="object"
+                            string="Quantity at Date" class="btn-primary"/>
+                    <button name="action_show_moves" type="object"
+                            string="Moves of the Day" class="btn-primary"/>
+                    <button string="Close" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- 2) Page de résultat (boutons 1 et 2) : une ligne par
+            (produit, lieu, lot), avec le bouton "Details" -->
+    <record id="inventory_historical_qty_line_view_list" model="ir.ui.view">
+        <field name="name">inventory.historical.qty.line.list</field>
+        <field name="model">inventory.historical.qty.line</field>
+        <field name="arch" type="xml">
+            <list string="Historical Quantity" create="0" delete="0" edit="0">
+                <field name="product_id"/>
+                <field name="categ_id" optional="hide"/>
+                <field name="warehouse_id" optional="hide"/>
+                <field name="location_id"/>
+                <field name="lot_id" optional="show"/>
+                <field name="qty_start"/>
+                <field name="in_qty"/>
+                <field name="out_qty"/>
+                <field name="qty_end"/>
+                <field name="period_from" optional="hide"/>
+                <field name="period_to" optional="hide"/>
+                <button name="action_view_moves" type="object"
+                        string="Details" class="btn-link"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Barre de recherche : filtrer par produit, emplacement (avec ses
+         sous-emplacements), catégorie, entrepôt ou lot -->
+    <record id="inventory_historical_qty_line_view_search" model="ir.ui.view">
+        <field name="name">inventory.historical.qty.line.search</field>
+        <field name="model">inventory.historical.qty.line</field>
+        <field name="arch" type="xml">
+            <search string="Search Historical Quantity">
+                <field name="product_id"/>
+                <field name="location_id" operator="child_of"/>
+                <field name="categ_id" operator="child_of"/>
+                <field name="warehouse_id"/>
+                <field name="lot_id"/>
+                <filter name="filter_with_moves" string="With Moves"
+                        domain="['|', ('in_qty', '!=', 0), ('out_qty', '!=', 0)]"/>
+                <group>
+                    <filter name="group_location" string="Location"
+                            context="{'group_by': 'location_id'}"/>
+                    <filter name="group_product" string="Product"
+                            context="{'group_by': 'product_id'}"/>
+                    <filter name="group_category" string="Product Category"
+                            context="{'group_by': 'categ_id'}"/>
+                    <filter name="group_warehouse" string="Warehouse"
+                            context="{'group_by': 'warehouse_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- 3) Page de détails (bouton "Details") : mouvements d'une ligne,
+            entrées et sorties dans deux colonnes séparées -->
+    <record id="inventory_historical_move_view_list" model="ir.ui.view">
+        <field name="name">inventory.historical.move.list</field>
+        <field name="model">inventory.historical.move</field>
+        <field name="arch" type="xml">
+            <list string="Moves" create="0" delete="0" edit="0"
+                  decoration-success="in_qty &gt; 0"
+                  decoration-danger="out_qty &gt; 0">
+                <field name="date"/>
+                <field name="reference"/>
+                <field name="product_id" optional="hide"/>
+                <field name="lot_id" optional="hide"/>
+                <field name="location_id"/>
+                <field name="location_dest_id"/>
+                <field name="in_qty" sum="Total Incoming"/>
+                <field name="out_qty" sum="Total Outgoing"/>
+            </list>
+        </field>
+    </record>
+
+</odoo>

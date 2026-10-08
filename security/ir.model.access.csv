@@ -4,3 +4,6 @@ access_inventory_audit_manager,inventory.audit manager,model_inventory_audit,sto
 access_inventory_audit_line_user,inventory.audit.line user,model_inventory_audit_line,stock.group_stock_user,1,1,1,0
 access_inventory_audit_line_manager,inventory.audit.line manager,model_inventory_audit_line,stock.group_stock_manager,1,1,1,1
 access_inventory_audit_revert_wizard,inventory.audit.revert.wizard,model_inventory_audit_revert_wizard,stock.group_stock_user,1,1,1,1
+access_inventory_historical_qty_wizard,inventory.historical.qty.wizard,model_inventory_historical_qty_wizard,stock.group_stock_user,1,1,1,1
+access_inventory_historical_qty_line,inventory.historical.qty.line,model_inventory_historical_qty_line,stock.group_stock_user,1,1,1,1
+access_inventory_historical_move,inventory.historical.move,model_inventory_historical_move,stock.group_stock_user,1,1,1,1

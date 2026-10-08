@@ -8,12 +8,11 @@
     'depends': ['stock', 'product'],
 
     # Fichiers chargés à l'installation, DANS CET ORDRE
-    'data': [
+        'data': [
         'security/ir.model.access.csv',
         'data/inventory_audit_sequence.xml',
-        # NOUVEAU : vue du wizard de revert (avant la vue principale,
-        # par habitude, même si l'ordre n'est pas obligatoire ici)
         'views/inventory_audit_revert_wizard_views.xml',
+        'views/inventory_historical_qty_wizard_views.xml',
         'views/inventory_audit_views.xml',
     ],
 

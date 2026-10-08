@@ -36,3 +36,4 @@ class StockMove(models.Model):
             # Mouvement classique (livraison, réception...) : ni l'un ni l'autre
             else:
                 move.audit_move_type = False
+                

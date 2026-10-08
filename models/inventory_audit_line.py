@@ -27,15 +27,18 @@ class InventoryAuditLine(models.Model):
         'stock.lot', string="Lot/Serial Number",
         domain="[('product_id', '=', product_id)]")
 
-    # Stock du système au démarrage de l'audit
+    # Stock du système : calculé à la date du comptage au démarrage,
+    # puis mis à jour par le bouton "Refresh" avec les opérations
+    # faites depuis (écrit par le code, jamais à la main)
     theoretical_qty = fields.Float(
         string="Theoretical Quantity", readonly=True, digits='Product Unit')
 
-    # Saisi par le personnel d'entrepôt
+    # Saisi par le personnel d'entrepôt (décalé par "Refresh" de la
+    # même variation que la théorique)
     counted_qty = fields.Float(
         string="Counted Quantity", default=0.0, digits='Product Unit')
 
-    # Écart = comptée - théorique
+    # Écart = comptée - théorique (inchangé par "Refresh")
     difference_qty = fields.Float(
         string="Difference", compute='_compute_difference_qty',
         store=True, digits='Product Unit')

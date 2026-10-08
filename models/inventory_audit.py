@@ -14,6 +14,9 @@ from odoo.osv import expression
 
 class InventoryAudit(models.Model):
     _name = 'inventory.audit'
+    # Récupère _get_historical_quantities (calcul de la quantité à une
+    # date), partagé avec l'écran "Historical Quantity"
+    _inherit = ['inventory.historical.mixin']
     _description = "Inventory Audit"
     _order = 'audit_date desc, id desc'
 
@@ -25,8 +28,19 @@ class InventoryAudit(models.Model):
         string="Reference", required=True, copy=False,
         default=lambda self: _("New Inventory Audit"))
 
+    # DATE DU COMPTAGE physique.
+    # La quantité théorique est calculée à cette date précise.
+    # (nom technique inchangé pour ne pas casser la base ni les vues)
     audit_date = fields.Datetime(
-        string="Audit Date", required=True, default=fields.Datetime.now)
+        string="Count Date", required=True, default=fields.Datetime.now,
+        help="Date and time of the physical count. The theoretical "
+             "quantity is computed as of this moment.")
+
+    # Date à laquelle l'audit est appliqué sur le stock
+    # (remplie automatiquement au clic sur "Validate Inventory")
+    validation_date = fields.Datetime(
+        string="Validation Date", readonly=True, copy=False,
+        help="Date on which the audit was applied to the stock.")
 
     user_id = fields.Many2one(
         'res.users', string="Responsible",
@@ -118,25 +132,21 @@ class InventoryAudit(models.Model):
                     audit.name))
 
     # ------------------------------------------------------------------
-    # Bouton "Start Inventory"
+    # Périmètre : domaine de recherche
     # ------------------------------------------------------------------
 
-    def _get_quant_domain(self):
+    def _get_scope_domain(self, location_field='location_id'):
+        # Domaine du périmètre (cases cochées combinées avec OR).
+        # location_field permet de l'appliquer sur stock.quant (location_id)
+        # ou sur stock.move.line (location_id OU location_dest_id).
         self.ensure_one()
-
-        base_domain = [
-            ('location_id.usage', '=', 'internal'),
-            ('company_id', '=', self.company_id.id),
-            ('quantity', '!=', 0),
-        ]
-
         scope_domains = []
 
         if self.scope_warehouse:
             if not self.warehouse_id:
                 raise UserError(_("Please select a warehouse."))
             scope_domains.append([(
-                'location_id', 'child_of',
+                location_field, 'child_of',
                 self.warehouse_id.view_location_id.id)])
 
         if self.scope_category:
@@ -154,37 +164,157 @@ class InventoryAudit(models.Model):
             if not self.location_ids:
                 raise UserError(_("Please select at least one location."))
             scope_domains.append([(
-                'location_id', 'child_of', self.location_ids.ids)])
+                location_field, 'child_of', self.location_ids.ids)])
 
         if not scope_domains:
             raise UserError(_("Please select at least one audit scope."))
 
-        return expression.AND([base_domain, expression.OR(scope_domains)])
+        return expression.OR(scope_domains)
+
+    # ------------------------------------------------------------------
+    # Quantité à la date du comptage -> lignes d'audit
+    # ------------------------------------------------------------------
+
+    def _get_historical_lines_vals(self):
+        # Utilise la méthode du mixin (la même que l'écran
+        # "Historical Quantity") avec la date du comptage.
+        # Appelée par : action_start
+        # Retourne : liste de dicts prêts pour inventory.audit.line.create
+        self.ensure_one()
+        quantities = self._get_historical_quantities(
+            self.audit_date, self.company_id, self._get_scope_domain)
+
+        Product = self.env['product.product']
+        vals_list = []
+        for key in sorted(quantities):
+            product_id, location_id, lot_id = key
+            # quantities[key] = (quantité actuelle, quantité à la date)
+            historical = quantities[key][1]
+            rounding = Product.browse(product_id).uom_id.rounding
+            if float_is_zero(historical, precision_rounding=rounding):
+                continue
+            vals_list.append({
+                'audit_id': self.id,
+                'product_id': product_id,
+                'location_id': location_id,
+                'lot_id': lot_id or False,
+                # Quantité du système À LA DATE DU COMPTAGE
+                'theoretical_qty': historical,
+                # Par défaut = théorique (le personnel saisit ensuite)
+                'counted_qty': historical,
+            })
+        return vals_list
+
+    # ------------------------------------------------------------------
+    # Bouton "Historical Quantity" -> ouvre le popup de calcul
+    # ------------------------------------------------------------------
+
+    def action_open_historical_qty(self):
+        # Aperçu seulement : ne crée aucune ligne, ne change pas le statut
+        # et ne touche pas au stock.
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Historical Quantity"),
+            'res_model': 'inventory.historical.qty.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            # La date du popup est pré-remplie avec la date du comptage
+            'context': {
+                'default_date': fields.Datetime.to_string(self.audit_date),
+                'default_company_id': self.company_id.id,
+            },
+        }
+
+    # ------------------------------------------------------------------
+    # Bouton "Start Inventory"
+    # ------------------------------------------------------------------
 
     def action_start(self):
         for audit in self:
             if audit.state != 'draft':
                 raise UserError(_("Only a draft audit can be started."))
 
-            quants = self.env['stock.quant'].search(audit._get_quant_domain())
-            if not quants:
+            if audit.audit_date > fields.Datetime.now():
+                raise UserError(_("The count date cannot be in the future."))
+
+            # Lignes basées sur la quantité à la date du comptage
+            vals_list = audit._get_historical_lines_vals()
+            if not vals_list:
                 raise UserError(_("No stock found for the selected scope."))
 
             audit.line_ids.unlink()
-
-            vals_list = []
-            for quant in quants:
-                vals_list.append({
-                    'audit_id': audit.id,
-                    'product_id': quant.product_id.id,
-                    'location_id': quant.location_id.id,
-                    'lot_id': quant.lot_id.id,
-                    'theoretical_qty': quant.quantity,
-                    'counted_qty': quant.quantity,
-                })
-
             self.env['inventory.audit.line'].create(vals_list)
             audit.state = 'in_progress'
+
+    # ------------------------------------------------------------------
+    # Bouton "Refresh" : met à jour les lignes avec les opérations
+    # faites depuis le démarrage de l'audit
+    # ------------------------------------------------------------------
+
+    def action_refresh(self):
+        # Pour chaque ligne :
+        #   nouvelle théorique = quantité ACTUELLE du système
+        #   variation          = nouvelle théorique - ancienne théorique
+        #   comptée            = comptée + variation
+        # La différence (comptée - théorique) reste donc la même : seules
+        # les opérations faites depuis le démarrage sont ajoutées aux
+        # deux quantités. Exemple : 70 / 60 (diff -10), puis vente de 10
+        # -> Refresh -> 60 / 50 (diff -10).
+        # Peut être cliqué plusieurs fois sans risque (sans nouvelle
+        # opération, la variation est 0).
+        Product = self.env['product.product']
+        for audit in self:
+            if audit.state != 'in_progress':
+                raise UserError(_("Only an audit in progress can be refreshed."))
+
+            # Quantités ACTUELLES du système par (produit, lieu, lot).
+            # [0] = quantité actuelle (le mixin renvoie (actuelle, à la date))
+            quantities = audit._get_historical_quantities(
+                fields.Datetime.now(), audit.company_id,
+                audit._get_scope_domain)
+            current = {key: values[0] for key, values in quantities.items()}
+
+            # 1) Lignes existantes : on décale théorique ET comptée
+            existing_keys = set()
+            for line in audit.line_ids:
+                key = (line.product_id.id, line.location_id.id, line.lot_id.id)
+                existing_keys.add(key)
+
+                new_theoretical = current.get(key, 0.0)
+                delta = new_theoretical - line.theoretical_qty
+
+                rounding = line.product_id.uom_id.rounding
+                if float_is_zero(delta, precision_rounding=rounding):
+                    continue
+
+                line.write({
+                    'theoretical_qty': new_theoretical,
+                    'counted_qty': line.counted_qty + delta,
+                })
+
+            # 2) Nouveau stock apparu dans le périmètre depuis le démarrage
+            #    (ex. réception dans un emplacement sans ligne) : on crée
+            #    la ligne avec comptée = théorique (différence 0)
+            new_vals = []
+            for key, qty in sorted(current.items()):
+                if key in existing_keys:
+                    continue
+                product_id, location_id, lot_id = key
+                rounding = Product.browse(product_id).uom_id.rounding
+                if float_is_zero(qty, precision_rounding=rounding):
+                    continue
+                new_vals.append({
+                    'audit_id': audit.id,
+                    'product_id': product_id,
+                    'location_id': location_id,
+                    'lot_id': lot_id or False,
+                    'theoretical_qty': qty,
+                    'counted_qty': qty,
+                })
+
+            if new_vals:
+                self.env['inventory.audit.line'].create(new_vals)
 
     # ------------------------------------------------------------------
     # Bouton "Validate Inventory"
@@ -231,13 +361,19 @@ class InventoryAudit(models.Model):
         move = self.env['stock.move'].create(move_vals)
         move._action_done()
 
-        move.write({'date': self.audit_date})
-        move.move_line_ids.write({'date': self.audit_date})
+        # Le mouvement est daté du jour de la VALIDATION (et non de la
+        # date du comptage) : l'historique passé des stocks et les
+        # rapports anciens ne changent donc pas.
+        move.write({'date': self.validation_date})
+        move.move_line_ids.write({'date': self.validation_date})
 
     def action_validate(self):
         for audit in self:
             if audit.state != 'in_progress':
                 raise UserError(_("Only an audit in progress can be validated."))
+
+            # Date d'application de l'audit sur le stock
+            audit.validation_date = fields.Datetime.now()
 
             for line in audit.line_ids:
                 rounding = line.product_id.uom_id.rounding
